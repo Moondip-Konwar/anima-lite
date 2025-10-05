@@ -108,13 +108,13 @@ class AnimeLibraryApp(tb.Window):
 
         def _play_thread():
             instance = vlc.Instance()
-            player = instance.media_player_new()
+            player = instance.media_player_new()  # type: ignore
 
             for i in range(start_index, len(self.current_episodes)):
                 episode_file = self.current_episodes[i]
                 full_path = os.path.join(self.current_anime_path, episode_file)
 
-                media = instance.media_new(full_path)
+                media = instance.media_new(full_path)  # type: ignore
                 player.set_media(media)
 
                 # Optional: Enable subtitles automatically
@@ -127,9 +127,11 @@ class AnimeLibraryApp(tb.Window):
                 while True:
                     state = player.get_state()
                     # Save progress: episode index + current time
-                    self.current_playback_position = player.get_time() / 1000  # seconds
+                    self.current_playback_position = (
+                        player.get_time() / 1000
+                    )  # seconds # type: ignore
 
-                    if state in [vlc.State.Ended, vlc.State.Stopped, vlc.State.Error]:
+                    if state in [vlc.State.Ended, vlc.State.Stopped, vlc.State.Error]:  # type: ignore
                         break
                     time.sleep(0.5)
 
@@ -138,13 +140,13 @@ class AnimeLibraryApp(tb.Window):
 
     def set_playback_speed(self, rate: float):
         """Set the speed of current playback (e.g., 1.5x, 2x)"""
-        if hasattr(self, "player") and self.player:
-            self.player.set_rate(rate)
+        if hasattr(self, "player") and self.player:  # type: ignore
+            self.player.set_rate(rate)  # type: ignore
 
     def pause_resume(self):
         """Toggle pause/resume"""
-        if hasattr(self, "player") and self.player:
-            self.player.pause()
+        if hasattr(self, "player") and self.player:  # type: ignore
+            self.player.pause()  # type: ignore
 
 
 if __name__ == "__main__":
