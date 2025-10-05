@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from natsort import natsorted
 
