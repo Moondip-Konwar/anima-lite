@@ -70,24 +70,27 @@ class AnimeLibraryApp(tb.Window):
 
     def on_anime_select(self, event):
         """Triggered when an anime is selected"""
-        selection = self.anime_listbox.curselection()
-        if not selection:
-            return
+        try:
+            selection = self.anime_listbox.curselection()
+            if not selection:
+                return
 
-        index = selection[0]
-        anime_name, anime_path = self.anime_list[index]
+            index = selection[0]
+            anime_name, anime_path = self.anime_list[index]
 
-        # Load episodes for this anime
-        episodes = self.library.list_episode_files(anime_path)
-        self.current_anime_path = anime_path
-        self.current_episodes = episodes  # store for playlist
-        self.current_episode_index = 0  # reset playlist pointer
+            # Load episodes for this anime
+            episodes = self.library.list_episode_files(anime_path)
+            self.current_anime_path = anime_path
+            self.current_episodes = episodes  # store for playlist
+            self.current_episode_index = 0  # reset playlist pointer
 
-        # Set episode list in UI
-        self.episode_list_var.set(episodes)
+            # Set episode list in UI
+            self.episode_list_var.set(episodes)  # type: ignore
 
-        # Bind double-click to play
-        self.episode_listbox.bind("<Double-Button-1>", self.on_episode_double_click)
+            # Bind double-click to play
+            self.episode_listbox.bind("<Double-Button-1>", self.on_episode_double_click)
+        except Exception as e:
+            print(f"Error loading episodes for {anime_name}: {str(e)}")
 
     def on_episode_double_click(self, event):
         """Triggered when an episode is double-clicked"""
