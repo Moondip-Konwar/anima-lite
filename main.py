@@ -7,7 +7,7 @@ import ttkbootstrap as tb
 import vlc
 from ttkbootstrap.constants import *
 
-from utils import AnimeLibrary  # your class from previous code
+from utils import AnimeLibrary
 
 
 class AnimeLibraryApp(tb.Window):
