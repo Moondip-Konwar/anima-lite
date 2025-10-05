@@ -74,23 +74,30 @@ class AnimeLibraryApp(tb.Window):
             selection = self.anime_listbox.curselection()
             if not selection:
                 return
-
             index = selection[0]
             anime_name, anime_path = self.anime_list[index]
-
             # Load episodes for this anime
             episodes = self.library.list_episode_files(anime_path)
             self.current_anime_path = anime_path
             self.current_episodes = episodes  # store for playlist
             self.current_episode_index = 0  # reset playlist pointer
-
             # Set episode list in UI
-            self.episode_list_var.set(episodes)  # type: ignore
-
+            self.episode_list_var.set(episodes)
             # Bind double-click to play
             self.episode_listbox.bind("<Double-Button-1>", self.on_episode_double_click)
         except Exception as e:
             print(f"Error loading episodes for {anime_name}: {str(e)}")
+            # Show error message to the user
+            self.show_error_message(f"Failed to load episodes: {str(e)}")
+
+    def show_error_message(self, message):
+        """Show an error message to the user"""
+        error_dialog = tk.Toplevel(self.master)
+        error_dialog.title("Error")
+        label = tb.Label(error_dialog, text=message)
+        label.pack(padx=10, pady=10)
+        button = tb.Button(error_dialog, text="OK", command=error_dialog.destroy)
+        button.pack(pady=5)
 
     def on_episode_double_click(self, event):
         """Triggered when an episode is double-clicked"""
