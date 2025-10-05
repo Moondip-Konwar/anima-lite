@@ -61,6 +61,10 @@ class AnimeLibraryApp(tb.Window):
         self.episode_listbox.pack(fill=BOTH, expand=True)
         scrollbar_x.config(command=self.episode_listbox.xview)
 
+        # Inside _setup_frames()
+        self.video_frame = tb.Frame(self.right_frame)
+        self.video_frame.pack(fill=BOTH, expand=True, pady=10)
+
     def load_anime_list(self):
         """Load all animes into the listbox"""
         self.anime_list = self.library.list_all_animes()
@@ -114,15 +118,23 @@ class AnimeLibraryApp(tb.Window):
             return
 
         def _play_thread():
-            instance = vlc.Instance()
+            instance = vlc.Instance("--no-xlib")  # 👈 Fix Xlib issue
             player = instance.media_player_new()
+            self.player = player  # store reference so we can control it later
+
+            # Embed the video output into Tkinter frame
+            if os.name == "posix":  # Linux (X11)
+                player.set_xwindow(self.video_frame.winfo_id())
+            elif os.name == "nt":  # Windows
+                player.set_hwnd(self.video_frame.winfo_id())
+
             for i in range(start_index, len(self.current_episodes)):
                 episode_file = self.current_episodes[i]
                 full_path = os.path.join(self.current_anime_path, episode_file)
                 media = instance.media_new(full_path)
                 player.set_media(media)
                 player.play()
-                time.sleep(0.1)  # small delay to let VLC start
+                time.sleep(0.1)
 
                 # Monitor playback
                 while True:
@@ -131,7 +143,6 @@ class AnimeLibraryApp(tb.Window):
                         break
                     time.sleep(0.5)
 
-        # Run playback in separate thread so UI remains responsive
         threading.Thread(target=_play_thread, daemon=True).start()
 
     def set_playback_speed(self, rate: float):
@@ -144,8 +155,14 @@ class AnimeLibraryApp(tb.Window):
         if hasattr(self, "player") and self.player:  # type: ignore
             self.player.pause()  # type: ignore
 
+    def on_close(self):
+        if hasattr(self, "player"):
+            self.player.stop()
+        self.destroy()
+
 
 if __name__ == "__main__":
-    VIDEOS_DIR = "/home/moondip/Videos"  # replace with your path
+    VIDEOS_DIR = "/home/moondip/Videos"
     app = AnimeLibraryApp(VIDEOS_DIR)
+    app.protocol("WM_DELETE_WINDOW", app.on_close)
     app.mainloop()
