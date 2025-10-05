@@ -1,6 +1,24 @@
+import json
 import os
 import re
 from typing import Literal, TypedDict
+
+from natsort import natsorted
+
+
+def write_json(file_path: str, data: dict) -> None:
+    """Write a dictionary to a JSON file. Create file if it doesn't exist."""
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+
+def read_json(file_path: str) -> dict:
+    """Read a JSON file and return a dictionary. Return empty dict if file doesn't exist."""
+    if not os.path.isfile(file_path):
+        return {}
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 class FileDirSplit(TypedDict):
@@ -19,6 +37,14 @@ class AnimeLibrary:
 
         self.root_dir = os.path.abspath(root_dir)
         os.chdir(self.root_dir)
+
+        # Load anime metadata from JSON if exists, else empty dict
+        self.json_file = os.path.join(self.root_dir, "anime_data.json")
+        self.anime_data: dict[str, dict] = read_json(self.json_file)
+
+    def save_anime_data(self) -> None:
+        """Save current anime data to JSON file."""
+        write_json(self.json_file, self.anime_data)
 
     @staticmethod
     def _split_files_and_dirs(items: list[str], base_path: str) -> FileDirSplit:
@@ -102,7 +128,10 @@ class AnimeLibrary:
         return self._guess_anime_name_from_episodes(episode_files)
 
     def scan(self) -> None:
-        """Scan all anime directories and print detected anime names."""
+        """
+        Scan all anime directories, populate self.anime_data,
+        and save to JSON automatically.
+        """
         anime_dirs = self.get_anime_directories()
 
         if not anime_dirs:
@@ -114,7 +143,71 @@ class AnimeLibrary:
         for folder in anime_dirs:
             folder_path = os.path.join(self.root_dir, folder)
             name_guess = self.get_anime_name(folder_path)
-            print(f"{folder}: {name_guess or '(Name not detected)'}")
+
+            if name_guess:
+                # Add or update the anime in internal data
+                self.add_or_update_anime(name_guess, folder_path)
+                print(f"{folder}: {name_guess}")
+            else:
+                print(f"{folder}: (Name not detected)")
+
+        # Save any new/updated anime data to JSON
+        self.save_anime_data()
+
+    def get_episode_path(
+        self, anime_folder_path: str, episode_number: int
+    ) -> str | None:
+        """
+        Return the full path of an episode using natural sort.
+        Returns None if episode_number is out of range.
+        """
+        if not os.path.isdir(anime_folder_path):
+            return None
+
+        files = self._split_files_and_dirs(
+            os.listdir(anime_folder_path), anime_folder_path
+        )["files"]
+        sorted_files = natsorted(files)
+        if 1 <= episode_number <= len(sorted_files):
+            return os.path.join(anime_folder_path, sorted_files[episode_number - 1])
+        return None
+
+    def list_all_animes(self) -> list[tuple[str, str]]:
+        """
+        Return a list of all anime names and their folder paths.
+        Uses self.anime_data if available, otherwise scans directories.
+        """
+        anime_list = []
+        if self.anime_data:
+            for name, info in self.anime_data.items():
+                anime_list.append((name, info.get("path", "")))
+        else:
+            dirs = self.get_anime_directories()
+            for folder in dirs:
+                path = os.path.join(self.root_dir, folder)
+                name = self.get_anime_name(path)
+                anime_list.append((name, path))
+                self.anime_data[name] = {"path": path}
+            self.save_anime_data()
+        return anime_list
+
+    def list_episode_files(self, anime_folder_path: str) -> list[str]:
+        """Return a naturally sorted list of episode files for a given anime folder."""
+        if not os.path.isdir(anime_folder_path):
+            return []
+        files = self._split_files_and_dirs(
+            os.listdir(anime_folder_path), anime_folder_path
+        )["files"]
+        return natsorted(files)
+
+    def count_episodes(self, anime_folder_path: str) -> int:
+        """Return the number of episodes in an anime folder."""
+        return len(self.list_episode_files(anime_folder_path))
+
+    def add_or_update_anime(self, anime_name: str, anime_folder_path: str) -> None:
+        """Add a new anime to the internal data or update existing entry."""
+        self.anime_data[anime_name] = {"path": anime_folder_path}
+        self.save_anime_data()
 
 
 if __name__ == "__main__":
