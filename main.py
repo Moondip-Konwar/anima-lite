@@ -18,7 +18,7 @@ class AnimeLibraryApp(tb.Window):
 
         # GUI variables
         self.selected_anime_index = tk.IntVar()
-        self.episode_list_var = tk.StringVar(value=[])
+        self.episode_list_var = tk.StringVar(value=[])  # type: ignore
 
         # Setup frames
         self._setup_frames()
@@ -58,18 +58,18 @@ class AnimeLibraryApp(tb.Window):
         for name, _ in self.anime_list:
             self.anime_listbox.insert("end", name)
 
-    def on_anime_select(self, event):
+    def on_anime_select(self, _event):
         """Triggered when an anime is selected"""
         selection = self.anime_listbox.curselection()
         if not selection:
             return
 
         index = selection[0]
-        anime_name, anime_path = self.anime_list[index]
+        _anime_name, anime_path = self.anime_list[index]
 
         # Load episodes for this anime
         episodes = self.library.list_episode_files(anime_path)
-        self.episode_list_var.set(episodes)
+        self.episode_list_var.set(episodes)  # type: ignore
 
 
 if __name__ == "__main__":
