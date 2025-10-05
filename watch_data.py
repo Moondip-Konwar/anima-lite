@@ -1,17 +1,28 @@
 # watch_data.py
-def save_watch_data(episode: str, position_ms: int):
-    """
-    Save the current episode and playback position.
-    For now, just a dummy function.
-    """
-    print(f"[SAVE] Episode: {episode}, Position: {position_ms}ms")
-    # You can replace with JSON or DB saving later
+import json
+import os
 
+WATCH_FILE = os.path.expanduser("~/.anime_watch_data.json")
 
-def load_watch_data() -> tuple[str, int]:
-    """
-    Load the last watched episode and position.
-    Returns: (episode_path, position_ms)
-    """
-    print("[LOAD] Returning dummy last watched episode")
-    return "", 0  # Dummy values
+def save_watch_data(anime_name: str, episode_file: str, position_ms: int = 0):
+    data = {}
+    if os.path.exists(WATCH_FILE):
+        with open(WATCH_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    data[anime_name] = {
+        "episode": episode_file,
+        "position_ms": position_ms
+    }
+    os.makedirs(os.path.dirname(WATCH_FILE), exist_ok=True)
+    with open(WATCH_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def load_watch_data(anime_name: str):
+    if not os.path.exists(WATCH_FILE):
+        return None
+    with open(WATCH_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if anime_name in data:
+        entry = data[anime_name]
+        return entry.get("episode", ""), entry.get("position_ms", 0)
+    return None
