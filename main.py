@@ -16,6 +16,25 @@ class AnimeLibraryApp(tb.Window):
         self.title("Anime Library Manager")
         self.geometry("800x600")
 
+        self.is_fullscreen = False
+        self.saved_geometry = None  # to restore window size after fullscreen
+
+        # Keybindings for playback control
+        self.bind_all("<KeyPress-q>", lambda e: self.stop_video())
+        self.bind("<space>", lambda e: self.pause_resume())  # pause/resume
+        self.bind("<period>", lambda e: self.increase_speed())  # '.' = faster
+        self.bind("<comma>", lambda e: self.decrease_speed())  # ',' = slower
+        self.bind("<r>", lambda e: self.reset_speed())  # 'r' = reset speed
+        self.bind("<Right>", lambda e: self.skip_seconds(10))  # → skip forward
+        self.bind("<Left>", lambda e: self.skip_seconds(-10))  # ← skip backward
+        self.bind_all(
+            "<KeyPress-f>", lambda e: self.toggle_fullscreen()
+        )  # toggle fullscreen
+        self.bind_all(
+            "<Escape>",
+            lambda e: self.toggle_fullscreen() if self.is_fullscreen else None,
+        )  # exit fullscreen
+
         # Load library
         self.library = AnimeLibrary(anime_dir)
         self.anime_list = []  # list of tuples (name, path)
@@ -61,9 +80,19 @@ class AnimeLibraryApp(tb.Window):
         self.episode_listbox.pack(fill=BOTH, expand=True)
         scrollbar_x.config(command=self.episode_listbox.xview)
 
-        # Inside _setup_frames()
+        # Video frame
         self.video_frame = tb.Frame(self.right_frame)
         self.video_frame.pack(fill=BOTH, expand=True, pady=10)
+        self.video_frame.update_idletasks()
+
+        # Control bar (bottom of right frame)
+        controls = tb.Frame(self.right_frame)
+        controls.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
+
+        btn_full = tb.Button(
+            controls, text="Fullscreen", command=self.toggle_fullscreen
+        )
+        btn_full.pack(side=tk.RIGHT, padx=5)
 
     def load_anime_list(self):
         """Load all animes into the listbox"""
@@ -94,6 +123,26 @@ class AnimeLibraryApp(tb.Window):
             # Show error message to the user
             self.show_error_message(f"Failed to load episodes: {str(e)}")
 
+    def toggle_fullscreen(self):
+        """Toggle Tkinter fullscreen + video expansion"""
+        if self.is_fullscreen:
+            # Exit fullscreen
+            self.attributes("-fullscreen", False)
+            if self.saved_geometry:
+                self.geometry(self.saved_geometry)
+            self.left_frame.pack(side=tk.LEFT, fill=tk.Y)
+            self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+            self.is_fullscreen = False
+            print("Exited fullscreen")
+        else:
+            # Enter fullscreen
+            self.saved_geometry = self.geometry()
+            self.attributes("-fullscreen", True)
+            self.left_frame.pack_forget()  # hide anime list
+            self.right_frame.pack(fill=BOTH, expand=True)  # video takes full window
+            self.is_fullscreen = True
+            print("Entered fullscreen")
+
     def show_error_message(self, message):
         """Show an error message to the user"""
         error_dialog = tk.Toplevel(self.master)
@@ -114,19 +163,28 @@ class AnimeLibraryApp(tb.Window):
 
     def play_episode(self, start_index: int):
         """Play the selected episode and continue playlist automatically"""
-        if not hasattr(self, "current_episodes"):
-            return
+        # 🧹 Stop any currently playing media first
+        if hasattr(self, "player") and self.player:
+            try:
+                self.player.stop()
+            except Exception:
+                pass
 
         def _play_thread():
-            instance = vlc.Instance("--no-xlib")  # 👈 Fix Xlib issue
+            instance = vlc.Instance("--no-xlib")  # 👈 enable native VLC UI controls
             player = instance.media_player_new()
             self.player = player  # store reference so we can control it later
 
             # Embed the video output into Tkinter frame
             if os.name == "posix":  # Linux (X11)
-                player.set_xwindow(self.video_frame.winfo_id())
+                player.set_xwindow(
+                    self.winfo_id()
+                )  # use main window id for fullscreen compatibility
             elif os.name == "nt":  # Windows
                 player.set_hwnd(self.video_frame.winfo_id())
+
+            # Allow fullscreen toggle
+            player.toggle_fullscreen()  # Optional: start in fullscreen if you want
 
             for i in range(start_index, len(self.current_episodes)):
                 episode_file = self.current_episodes[i]
@@ -139,7 +197,10 @@ class AnimeLibraryApp(tb.Window):
                 # Monitor playback
                 while True:
                     state = player.get_state()
-                    if state in [vlc.State.Ended, vlc.State.Stopped, vlc.State.Error]:
+                    if state == vlc.State.Ended:
+                        print("Episode ended, loading next...")
+                        break
+                    elif state in [vlc.State.Stopped, vlc.State.Error]:
                         break
                     time.sleep(0.5)
 
@@ -159,6 +220,47 @@ class AnimeLibraryApp(tb.Window):
         if hasattr(self, "player"):
             self.player.stop()
         self.destroy()
+
+    def increase_speed(self):
+        """Increase playback speed by +0.25x"""
+        if hasattr(self, "player") and self.player:
+            rate = self.player.get_rate()
+            new_rate = min(rate + 0.25, 4.0)
+            self.player.set_rate(new_rate)
+            print(f"Playback speed: {new_rate}x")
+
+    def decrease_speed(self):
+        """Decrease playback speed by -0.25x"""
+        if hasattr(self, "player") and self.player:
+            rate = self.player.get_rate()
+            new_rate = max(rate - 0.25, 0.25)
+            self.player.set_rate(new_rate)
+            print(f"Playback speed: {new_rate}x")
+
+    def reset_speed(self):
+        """Reset playback speed to normal"""
+        if hasattr(self, "player") and self.player:
+            self.player.set_rate(1.0)
+            print("Playback speed: 1.0x")
+
+    def skip_seconds(self, seconds: int):
+        """Skip forward or backward in the video"""
+        if hasattr(self, "player") and self.player:
+            time_pos = self.player.get_time()  # in ms
+            new_time = max(time_pos + (seconds * 1000), 0)
+            self.player.set_time(int(new_time))
+            print(f"Skipped {seconds} seconds")
+
+    def stop_video(self):
+        """Stop and release the current VLC player"""
+        if hasattr(self, "player") and self.player:
+            try:
+                self.player.stop()  # stop playback
+                self.player.release()  # free VLC resources
+                self.player = None  # clear reference
+                print("VLC player closed")
+            except Exception as e:
+                print(f"Failed to close VLC player: {e}")
 
 
 if __name__ == "__main__":
