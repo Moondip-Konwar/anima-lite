@@ -3,6 +3,7 @@ import tkinter as tk
 
 import ttkbootstrap as tb
 from PIL import Image, ImageTk
+from requests.exceptions import RequestException
 from ttkbootstrap.constants import *
 
 from cover_downloader import CACHE_DIR, download_cover
@@ -23,8 +24,6 @@ class AnimeLibraryUI(tb.Window):
 
         # Keep references to images to prevent garbage collection
         self.cover_images = {}
-
-        self.selected_anime_frame = None
 
         self._setup_layout()
         self.load_anime_grid()
@@ -62,6 +61,7 @@ class AnimeLibraryUI(tb.Window):
         self.canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
         self.grid_frame.bind("<Configure>", self._on_frame_configure)
 
+        # Right panel
         self.episode_label = tb.Label(
             self.right_frame, text="Episodes", font=("Segoe UI", 18, "bold")
         )
@@ -90,7 +90,9 @@ class AnimeLibraryUI(tb.Window):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     # ------------------- Anime Grid ------------------- #
+
     def load_anime_grid(self):
+        """Load anime cards into the scrollable grid with fixed image and title sizes."""
         for widget in self.grid_frame.winfo_children():
             widget.destroy()
 
@@ -98,6 +100,7 @@ class AnimeLibraryUI(tb.Window):
         col = 0
 
         for anime_name, anime_path in self.manager.anime_list:
+            # Parent card frame
             card_frame = tb.Frame(
                 self.grid_frame,
                 width=CARD_WIDTH,
@@ -108,43 +111,71 @@ class AnimeLibraryUI(tb.Window):
                 bootstyle="dark",
             )
             card_frame.grid(row=row, column=col, padx=10, pady=10)
-            card_frame.grid_propagate(False)
+            card_frame.grid_propagate(False)  # Prevent resizing
 
-            # Load cover image (download if missing)
+            # -------- Image Container --------
+            image_frame = tb.Frame(
+                card_frame, width=CARD_WIDTH, height=CARD_HEIGHT - 40
+            )
+            image_frame.pack_propagate(False)
+            image_frame.pack(side=TOP, fill=BOTH)
+
+            # Determine cover path
             filename = anime_name.replace(" ", "_") + ".jpg"
             cover_path = os.path.join(CACHE_DIR, filename)
+
+            # Download cover only if missing
             if not os.path.exists(cover_path):
-                cover_path = download_cover(anime_name) or None
+                try:
+                    result = download_cover(anime_name)
+                    if result:
+                        cover_path = result
+                except Exception:
+                    print(f"[UI] Could not download cover for {anime_name} (offline?)")
+                    cover_path = None
 
+            # Load image or fallback
             if cover_path and os.path.exists(cover_path):
-                img = Image.open(cover_path)
-                img = img.resize(
-                    (CARD_WIDTH, CARD_HEIGHT - 40), Image.Resampling.LANCZOS
-                )
-                photo = ImageTk.PhotoImage(img)
-                img_label = tb.Label(card_frame, image=photo)
-                img_label.image = photo
-                self.cover_images[anime_name] = photo  # keep reference
+                try:
+                    img = Image.open(cover_path).convert("RGB")
+                    img = img.resize(
+                        (CARD_WIDTH, CARD_HEIGHT - 40), Image.Resampling.LANCZOS
+                    )
+                    photo = ImageTk.PhotoImage(img)
+                    img_label = tb.Label(image_frame, image=photo)
+                    img_label.image = photo
+                    self.cover_images[anime_name] = photo
+                except Exception as e:
+                    print(f"[UI] Failed to load cover {cover_path}: {e}")
+                    img_label = tb.Label(image_frame, text="🖼️", font=("Segoe UI", 48))
             else:
-                img_label = tb.Label(card_frame, text="🖼️", font=("Segoe UI", 48))
+                img_label = tb.Label(image_frame, text="🖼️", font=("Segoe UI", 48))
 
-            img_label.pack(side=TOP, expand=True, fill=BOTH)
+            img_label.pack(fill=BOTH, expand=True)
+
+            # -------- Title Container --------
+            title_frame = tb.Frame(card_frame, width=CARD_WIDTH, height=40)
+            title_frame.pack_propagate(False)  # Fix title height
+            title_frame.pack(side=BOTTOM, fill=X)
 
             title_label = tb.Label(
-                card_frame,
+                title_frame,
                 text=anime_name,
                 font=("Segoe UI", 12),
                 wraplength=CARD_WIDTH,
+                anchor="center",
+                justify="center",
             )
-            title_label.pack(side=BOTTOM, pady=5)
+            title_label.pack(fill=BOTH, expand=True)
 
-            # Click bindings
+            # -------- Click Bindings --------
             for widget_item in (card_frame, img_label, title_label):
                 widget_item.bind(
                     "<Button-1>",
                     lambda e, n=anime_name, p=anime_path: self.select_anime(n, p),
                 )
 
+            # Increment grid position
             col += 1
             if col >= CARDS_PER_ROW:
                 col = 0
@@ -192,6 +223,7 @@ class AnimeLibraryUI(tb.Window):
 
 if __name__ == "__main__":
     VIDEOS_DIR = "/home/moondip/Videos"
+    os.makedirs(CACHE_DIR, exist_ok=True)
     app = AnimeLibraryUI(VIDEOS_DIR)
     app.protocol("WM_DELETE_WINDOW", app.on_close)
     app.mainloop()
