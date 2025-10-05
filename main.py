@@ -115,30 +115,19 @@ class AnimeLibraryApp(tb.Window):
 
         def _play_thread():
             instance = vlc.Instance()
-            player = instance.media_player_new()  # type: ignore
-
+            player = instance.media_player_new()
             for i in range(start_index, len(self.current_episodes)):
                 episode_file = self.current_episodes[i]
                 full_path = os.path.join(self.current_anime_path, episode_file)
-
-                media = instance.media_new(full_path)  # type: ignore
+                media = instance.media_new(full_path)
                 player.set_media(media)
-
-                # Optional: Enable subtitles automatically
-                player.video_set_spu(-1)  # -1 = default track if available
-
                 player.play()
                 time.sleep(0.1)  # small delay to let VLC start
 
                 # Monitor playback
                 while True:
                     state = player.get_state()
-                    # Save progress: episode index + current time
-                    self.current_playback_position = (
-                        player.get_time() / 1000
-                    )  # seconds # type: ignore
-
-                    if state in [vlc.State.Ended, vlc.State.Stopped, vlc.State.Error]:  # type: ignore
+                    if state in [vlc.State.Ended, vlc.State.Stopped, vlc.State.Error]:
                         break
                     time.sleep(0.5)
 
