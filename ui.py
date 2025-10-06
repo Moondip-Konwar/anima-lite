@@ -115,9 +115,7 @@ class AnimeLibraryUI(tb.Window):
             card_frame.grid_propagate(False)  # Prevent resizing
 
             # -------- Image Container --------
-            image_frame = tb.Frame(
-                card_frame, width=CARD_WIDTH, height=CARD_HEIGHT - 40
-            )
+            image_frame = tb.Frame(card_frame, width=CARD_WIDTH, height=CARD_HEIGHT)
             image_frame.pack_propagate(False)
             image_frame.pack(side=TOP, fill=BOTH)
 
@@ -142,7 +140,7 @@ class AnimeLibraryUI(tb.Window):
                 try:
                     img = Image.open(cover_path).convert("RGB")
                     img = img.resize(
-                        (CARD_WIDTH, CARD_HEIGHT - 40), Image.Resampling.LANCZOS
+                        (CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS
                     )
                     photo = ImageTk.PhotoImage(img)
                     img_label = tb.Label(image_frame, image=photo)
