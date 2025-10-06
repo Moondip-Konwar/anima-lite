@@ -68,7 +68,7 @@ class AnimeLibrary:
         separated = self._split_files_and_dirs(contents, full_path)
         file_count = len(separated["files"])
 
-        return file_count >= 10  # Arbitrary threshold, tweak as needed
+        return file_count >= 6  # Arbitrary threshold, tweak as needed
 
     def get_anime_directories(self) -> list[str]:
         """Return a list of directories that appear to contain anime series."""
