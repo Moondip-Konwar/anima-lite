@@ -1,0 +1,355 @@
+<!-- ui.html -->
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Anima-lite (web)</title>
+  <style>
+    :root {
+      --bg: #0f1113;
+      --card: #121315;
+      --muted: #9aa0a6;
+      --accent: #ff6600;
+      --text: #e6eef3;
+      --panel: #0b0b0c;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #070708 0%, #0b0d10 100%);
+      color: var(--text);
+    }
+
+    .app {
+      display: flex;
+      height: 100vh;
+      padding: 18px;
+      gap: 18px;
+      box-sizing: border-box;
+    }
+
+    /* Left: grid */
+    .left {
+      flex: 1 1 0%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      padding: 6px 10px;
+      color: var(--text);
+    }
+
+    .grid-wrap {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      height: calc(100% - 56px);
+    }
+
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-content: flex-start;
+      overflow: auto;
+      padding: 4px;
+    }
+
+    .card {
+      width: 150px;
+      height: 240px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #111215, #0f1113);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      transition:
+        transform 0.12s ease,
+        box-shadow 0.12s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.7);
+    }
+
+    .thumb {
+      width: 100%;
+      height: 200px;
+      display: block;
+      background: #222;
+      object-fit: cover;
+    }
+
+    .card-title {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* Right panel */
+    .right {
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: calc(100% - 20px);
+    }
+
+    .panel h3 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .episodes {
+      flex: 1 1 auto;
+      overflow: auto;
+      background: linear-gradient(180deg, #070707, #0c0c0c);
+      border-radius: 8px;
+      padding: 6px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+
+    .episode {
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin: 6px 4px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .episode:hover {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text);
+    }
+
+    .episode.selected {
+      background: rgba(255, 102, 0, 0.12);
+      color: var(--text);
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      border: 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    footer {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="left">
+      <div class="title">Anima-lite</div>
+      <div class="grid-wrap">
+        <div id="cards" class="cards">Loading...</div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="panel">
+        <h3 id="selectedTitle">Select an anime</h3>
+        <div class="episodes" id="episodes">No anime selected</div>
+
+        <div class="controls">
+          <button id="resumeBtn" class="btn">Resume Last Watched</button>
+          <button id="refreshBtn" class="btn">Refresh Library</button>
+        </div>
+        <div class="muted">
+          Double-click an episode to play. Playback handled by your existing
+          player module.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Local • Offline • No nonsense</footer>
+
+  <script>
+    const cardsEl = document.getElementById("cards");
+    const episodesEl = document.getElementById("episodes");
+    const selectedTitle = document.getElementById("selectedTitle");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+
+    let current = {name: null, path: null, episodes: []};
+
+    // Safe call wrapper for pywebview
+    async function apiCall(name, ...args) {
+      if (!window.pywebview || !pywebview.api || !pywebview.api[name]) {
+        console.error("pywebview API not available:", name);
+        return null;
+      }
+      try {
+        return await pywebview.api[name](...args);
+      } catch (e) {
+        console.error("API call error", name, e);
+        return null;
+      }
+    }
+
+    // Render cards
+    async function loadCards() {
+      cardsEl.innerHTML =
+        '<div style="color:var(--muted);padding:12px">Loading library…</div>';
+      const list = await apiCall("get_anime_list");
+      if (!list) {
+        cardsEl.innerHTML =
+          '<div style="color:var(--muted);padding:12px">Failed to load library.</div>';
+        return;
+      }
+      cardsEl.innerHTML = "";
+      for (const item of list) {
+        const card = document.createElement("div");
+        card.className = "card";
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.alt = item.name;
+        if (item.cover) img.src = item.cover;
+        else
+          img.src =
+            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="150" height="200"><rect width="100%" height="100%" fill="%23111"/><text x="50%" y="50%" fill="%23999" font-size="20" font-family="Arial" text-anchor="middle" dominant-baseline="middle">No%20Cover</text></svg>';
+        const title = document.createElement("div");
+        title.className = "card-title";
+        title.textContent = item.name;
+
+        card.appendChild(img);
+        card.appendChild(title);
+
+        card.addEventListener("click", async () => {
+          await selectAnime(item.name, item.path);
+        });
+
+        cardsEl.appendChild(card);
+      }
+    }
+
+    async function selectAnime(name, path) {
+      const res = await apiCall("select_anime", name, path);
+      if (!res) {
+        episodesEl.innerHTML =
+          '<div style="padding:12px;color:var(--muted)">Failed to load episodes.</div>';
+        return;
+      }
+      current.name = name;
+      current.path = path;
+      current.episodes = res.episodes;
+
+      selectedTitle.textContent = name;
+      renderEpisodes(res.episodes, res.last_watched);
+    }
+
+    function renderEpisodes(list, last_watched) {
+      episodesEl.innerHTML = "";
+      if (!list || list.length === 0) {
+        episodesEl.innerHTML =
+          '<div style="padding:12px;color:var(--muted)">No episodes found</div>';
+        return;
+      }
+      list.forEach((ep, idx) => {
+        const el = document.createElement("div");
+        el.className = "episode";
+        el.textContent = ep;
+        el.dataset.index = idx;
+        if (last_watched && last_watched.index === idx) {
+          el.classList.add("selected");
+          // scroll into view a bit
+          setTimeout(() => el.scrollIntoView({block: "center"}), 100);
+        }
+        // single click selects highlight only
+        el.addEventListener("click", () => {
+          // clear previous
+          const prev = episodesEl.querySelector(".episode.selected");
+          if (prev) prev.classList.remove("selected");
+          el.classList.add("selected");
+        });
+
+        // double click -> play
+        el.addEventListener("dblclick", async () => {
+          const idx = parseInt(el.dataset.index);
+          await apiCall("play_index", idx);
+        });
+
+        episodesEl.appendChild(el);
+      });
+    }
+
+    resumeBtn.addEventListener("click", async () => {
+      if (!current.name) return;
+      const res = await apiCall("resume_last_watched_action");
+      if (res && res.last_watched) {
+        // highlight
+        renderEpisodes(current.episodes, res.last_watched);
+      } else {
+        console.log("No last watched info");
+      }
+    });
+
+    refreshBtn.addEventListener("click", loadCards);
+
+    // initial load
+    // initial load — wait for pywebview API to be ready
+    window.addEventListener("pywebviewready", () => {
+      loadCards();
+    });
+  </script>
+</body>
+
+</html>
