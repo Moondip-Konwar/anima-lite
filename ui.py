@@ -1,10 +1,7 @@
 import os
 import tkinter as tk
-
-import ttkbootstrap as tb
 from PIL import Image, ImageTk
-from requests.exceptions import RequestException
-from ttkbootstrap.constants import *
+import customtkinter as ctk
 
 from cover_downloader import CACHE_DIR, download_cover
 from manager import AnimeManager
@@ -12,60 +9,88 @@ from manager import AnimeManager
 CARD_WIDTH = 150
 CARD_HEIGHT = 200
 CARDS_PER_ROW = 5
+CARD_BG = "#1e1e1e"
+CARD_HOVER_BG = "#2a2a2a"
+CARD_BORDER_COLOR = "#444"
 
+class HoverFrame(ctk.CTkFrame):
+    """CTkFrame with hover effect"""
+    def __init__(self, master=None, hover_color=None, **kwargs):
+        # Remove hover_color from kwargs before passing to super()
+        self.hover_color = hover_color or "#2a2a2a"
+        self.default_color = kwargs.get("fg_color", "#1e1e1e")
+        super().__init__(master, **kwargs)
 
-class AnimeLibraryUI(tb.Window):
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+        self._widgets = []
+
+    def add_widget(self, widget):
+        self._widgets.append(widget)
+
+    def on_enter(self, event):
+        self.configure(fg_color=self.hover_color)
+        for w in self._widgets:
+            if hasattr(w, "configure"):
+                w.configure(fg_color=self.hover_color)
+
+    def on_leave(self, event):
+        self.configure(fg_color=self.default_color)
+        for w in self._widgets:
+            if hasattr(w, "configure"):
+                w.configure(fg_color=self.default_color)
+
+class AnimeLibraryUI(ctk.CTk):
     def __init__(self, anime_dir: str):
-        super().__init__(themename="darkly")
+        super().__init__()
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue")
+
         self.title("Anime Library")
         self.geometry("1200x700")
 
         self.manager = AnimeManager(anime_dir)
-
-        # Keep references to images to prevent garbage collection
         self.cover_images = {}
 
         self._setup_layout()
         self.load_anime_grid()
 
-        # Keybindings
         self.bind_all("<KeyPress-q>", lambda e: self.stop_video())
 
     def _setup_layout(self):
-        self.left_frame = tb.Frame(self, padding=10)
-        self.left_frame.pack(side=LEFT, fill=BOTH, expand=True)
+        self.left_frame = ctk.CTkFrame(self, corner_radius=0)
+        self.left_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        self.right_frame = tb.Frame(self, padding=10)
-        self.right_frame.pack(side=RIGHT, fill=Y)
+        self.right_frame = ctk.CTkFrame(self, width=300, corner_radius=0)
+        self.right_frame.pack(side="right", fill="y", padx=10, pady=10)
 
-        self.title_label = tb.Label(
+        self.title_label = ctk.CTkLabel(
             self.left_frame,
             text="Anime Library",
-            font=("Segoe UI", 24, "bold"),
-            padding=10,
+            font=ctk.CTkFont(size=24, weight="bold")
         )
-        self.title_label.pack(side=TOP, fill=X)
+        self.title_label.pack(side="top", fill="x", pady=(0, 10))
 
-        self.canvas_frame = tb.Frame(self.left_frame)
-        self.canvas_frame.pack(side=TOP, fill=BOTH, expand=True)
+        self.canvas_frame = ctk.CTkFrame(self.left_frame, corner_radius=0)
+        self.canvas_frame.pack(side="top", fill="both", expand=True)
 
         self.canvas = tk.Canvas(self.canvas_frame, bg="#121212", highlightthickness=0)
-        self.scrollbar = tb.Scrollbar(
-            self.canvas_frame, orient=VERTICAL, command=self.canvas.yview
-        )
+        self.scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.pack(side=RIGHT, fill=Y)
-        self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
 
-        self.grid_frame = tb.Frame(self.canvas, style="Card.TFrame")
+        self.grid_frame = ctk.CTkFrame(self.canvas, corner_radius=0)
         self.canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
         self.grid_frame.bind("<Configure>", self._on_frame_configure)
 
-        # Right panel
-        self.episode_label = tb.Label(
-            self.right_frame, text="Episodes", font=("Segoe UI", 18, "bold")
+        # Right Panel
+        self.episode_label = ctk.CTkLabel(
+            self.right_frame,
+            text="Episodes",
+            font=ctk.CTkFont(size=18, weight="bold")
         )
-        self.episode_label.pack(side=TOP, pady=5)
+        self.episode_label.pack(side="top", pady=5)
 
         self.episode_listbox = tk.Listbox(
             self.right_frame,
@@ -75,108 +100,93 @@ class AnimeLibraryUI(tb.Window):
             fg="white",
             selectbackground="#ff6600",
         )
-        self.episode_listbox.pack(side=TOP, fill=BOTH, expand=True)
+        self.episode_listbox.pack(side="top", fill="both", expand=True)
         self.episode_listbox.bind("<Double-Button-1>", self.on_episode_double_click)
 
-        self.btn_resume = tb.Button(
+        self.btn_resume = ctk.CTkButton(
             self.right_frame,
             text="Resume Last Watched",
-            bootstyle="warning",
+            fg_color="#ff6600",
+            hover_color="#ff8533",
             command=self.resume_last_watched,
         )
-        self.btn_resume.pack(side=TOP, pady=10)
+        self.btn_resume.pack(side="top", pady=10)
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
-    # ------------------- Anime Grid ------------------- #
-
     def load_anime_grid(self):
-        """Load anime cards into the scrollable grid with fixed image and title sizes."""
         for widget in self.grid_frame.winfo_children():
             widget.destroy()
 
-        row = 0
-        col = 0
-        skip_downloading_covers: bool = False
+        row, col = 0, 0
+        skip_downloading_covers = False
 
         for anime_name, anime_path in self.manager.anime_list:
-            # Parent card frame
-            card_frame = tb.Frame(
+            card_frame = HoverFrame(
                 self.grid_frame,
                 width=CARD_WIDTH,
-                height=CARD_HEIGHT,
-                padding=5,
-                relief=RAISED,
-                borderwidth=2,
-                bootstyle="dark",
+                height=CARD_HEIGHT + 40,
+                corner_radius=10,
+                fg_color=CARD_BG,
+                hover_color=CARD_HOVER_BG,
+                border_width=1,
+                border_color=CARD_BORDER_COLOR
             )
             card_frame.grid(row=row, column=col, padx=10, pady=10)
-            card_frame.grid_propagate(False)  # Prevent resizing
+            card_frame.grid_propagate(False)
 
-            # -------- Image Container --------
-            image_frame = tb.Frame(card_frame, width=CARD_WIDTH, height=CARD_HEIGHT)
+            # Image container
+            image_frame = ctk.CTkFrame(card_frame, width=CARD_WIDTH, height=CARD_HEIGHT, fg_color="transparent")
             image_frame.pack_propagate(False)
-            image_frame.pack(side=TOP, fill=BOTH)
+            image_frame.pack(side="top", fill="both")
 
-            # Determine cover path
+            # Load cover
             filename = anime_name.replace(" ", "_") + ".jpg"
             cover_path = os.path.join(CACHE_DIR, filename)
-
-            # Download cover only if missing
             if not skip_downloading_covers and not os.path.exists(cover_path):
                 try:
                     result = download_cover(anime_name)
                     if result:
                         cover_path = result
                 except Exception:
-                    print(f"[UI] Could not download cover for {anime_name} (offline?)")
-                    print("Skipping downloading for all covers....")
                     skip_downloading_covers = True
                     cover_path = None
 
-            # Load image or fallback
             if cover_path and os.path.exists(cover_path):
                 try:
                     img = Image.open(cover_path).convert("RGB")
-                    img = img.resize(
-                        (CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS
-                    )
+                    img = img.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
                     photo = ImageTk.PhotoImage(img)
-                    img_label = tb.Label(image_frame, image=photo)
+                    img_label = ctk.CTkLabel(image_frame, image=photo, text="")
                     img_label.image = photo
                     self.cover_images[anime_name] = photo
-                except Exception as e:
-                    print(f"[UI] Failed to load cover {cover_path}: {e}")
-                    img_label = tb.Label(image_frame, text="🖼️", font=("Segoe UI", 48))
+                except Exception:
+                    img_label = ctk.CTkLabel(image_frame, text="🖼️", font=("Segoe UI", 48))
             else:
-                img_label = tb.Label(image_frame, text="🖼️", font=("Segoe UI", 48))
+                img_label = ctk.CTkLabel(image_frame, text="🖼️", font=("Segoe UI", 48))
 
-            img_label.pack(fill=BOTH, expand=True)
+            img_label.pack(fill="both", expand=True)
+            card_frame.add_widget(img_label)
 
-            # -------- Title Container --------
-            title_frame = tb.Frame(card_frame, width=CARD_WIDTH, height=40)
-            title_frame.pack_propagate(False)  # Fix title height
-            title_frame.pack(side=BOTTOM, fill=X)
-
-            title_label = tb.Label(
-                title_frame,
+            # Title container
+            title_label = ctk.CTkLabel(
+                card_frame,
                 text=anime_name,
-                font=("Segoe UI", 12),
+                font=ctk.CTkFont(size=12),
                 wraplength=CARD_WIDTH,
-                anchor="center",
-                justify="center",
+                justify="center"
             )
-            title_label.pack(fill=BOTH, expand=True)
+            title_label.pack(side="bottom", fill="x", pady=5)
+            card_frame.add_widget(title_label)
 
-            # -------- Click Bindings --------
+            # Click bindings
             for widget_item in (card_frame, img_label, title_label):
                 widget_item.bind(
                     "<Button-1>",
                     lambda e, n=anime_name, p=anime_path: self.select_anime(n, p),
                 )
 
-            # Increment grid position
             col += 1
             if col >= CARDS_PER_ROW:
                 col = 0
@@ -188,14 +198,12 @@ class AnimeLibraryUI(tb.Window):
         for ep in self.manager.current_episodes:
             self.episode_listbox.insert("end", ep)
 
-        # Highlight last watched episode
         result = self.manager.resume_last_watched()
         if result:
             episode_file, _ = result
             ep_index = self.manager.current_episodes.index(episode_file)
             self.episode_listbox.selection_clear(0, "end")
             self.episode_listbox.selection_set(ep_index)
-            print(f"[UI] Highlighting last watched: {episode_file}")
 
     def on_episode_double_click(self, event):
         selection = self.episode_listbox.curselection()
@@ -210,9 +218,6 @@ class AnimeLibraryUI(tb.Window):
             episode_file, index = result
             self.episode_listbox.selection_clear(0, "end")
             self.episode_listbox.selection_set(index)
-            print(f"[UI] Resuming last watched: {episode_file}")
-        else:
-            print("[UI] No last watched info available!")
 
     def stop_video(self):
         self.manager.player.stop()
