@@ -18,11 +18,19 @@ def save_watch_data(anime_name: str, episode_file: str, position_ms: int = 0):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 def load_watch_data(anime_name: str):
-    if not os.path.exists(WATCH_FILE):
+    if not os.path.exists(WATCH_FILE) or os.path.getsize(WATCH_FILE) == 0:
         return None
-    with open(WATCH_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
+
+    try:
+        with open(WATCH_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        # corrupted file — reset
+        os.remove(WATCH_FILE)
+        return None
+
     if anime_name in data:
         entry = data[anime_name]
         return entry.get("episode", ""), entry.get("position_ms", 0)
     return None
+
