@@ -12,15 +12,18 @@ CARDS_PER_ROW = 5
 CARD_BG = "#1e1e1e"
 CARD_HOVER_BG = "#2a2a2a"
 CARD_BORDER_COLOR = "#444"
+EPISODE_PANEL_WIDTH = 220  # Reduced by ~25%
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("dark-blue")
+
 
 class HoverFrame(ctk.CTkFrame):
     """CTkFrame with hover effect"""
     def __init__(self, master=None, hover_color=None, **kwargs):
-        # Remove hover_color from kwargs before passing to super()
-        self.hover_color = hover_color or "#2a2a2a"
-        self.default_color = kwargs.get("fg_color", "#1e1e1e")
+        self.hover_color = hover_color or CARD_HOVER_BG
+        self.default_color = kwargs.get("fg_color", CARD_BG)
         super().__init__(master, **kwargs)
-
         self.bind("<Enter>", self.on_enter)
         self.bind("<Leave>", self.on_leave)
         self._widgets = []
@@ -40,15 +43,12 @@ class HoverFrame(ctk.CTkFrame):
             if hasattr(w, "configure"):
                 w.configure(fg_color=self.default_color)
 
+
 class AnimeLibraryUI(ctk.CTk):
     def __init__(self, anime_dir: str):
         super().__init__()
-        ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("dark-blue")
-
-        self.title("Anime Library")
+        self.title("Anima Lite")
         self.geometry("1200x700")
-
         self.manager = AnimeManager(anime_dir)
         self.cover_images = {}
 
@@ -58,19 +58,25 @@ class AnimeLibraryUI(ctk.CTk):
         self.bind_all("<KeyPress-q>", lambda e: self.stop_video())
 
     def _setup_layout(self):
+        # Left frame
         self.left_frame = ctk.CTkFrame(self, corner_radius=0)
         self.left_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        self.right_frame = ctk.CTkFrame(self, width=300, corner_radius=0)
+        # Right frame
+        self.right_frame = ctk.CTkFrame(self, width=EPISODE_PANEL_WIDTH, corner_radius=0)
         self.right_frame.pack(side="right", fill="y", padx=10, pady=10)
 
+        # Title
         self.title_label = ctk.CTkLabel(
             self.left_frame,
-            text="Anime Library",
-            font=ctk.CTkFont(size=24, weight="bold")
+            text="Anima Lite",
+            font=ctk.CTkFont(size=32, weight="bold"),
+            fg_color=None,
+            text_color="#ff6600"
         )
         self.title_label.pack(side="top", fill="x", pady=(0, 10))
 
+        # Scrollable canvas for anime grid
         self.canvas_frame = ctk.CTkFrame(self.left_frame, corner_radius=0)
         self.canvas_frame.pack(side="top", fill="both", expand=True)
 
@@ -84,7 +90,7 @@ class AnimeLibraryUI(ctk.CTk):
         self.canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
         self.grid_frame.bind("<Configure>", self._on_frame_configure)
 
-        # Right Panel
+        # Episodes panel
         self.episode_label = ctk.CTkLabel(
             self.right_frame,
             text="Episodes",
@@ -92,25 +98,33 @@ class AnimeLibraryUI(ctk.CTk):
         )
         self.episode_label.pack(side="top", pady=5)
 
-        self.episode_listbox = tk.Listbox(
-            self.right_frame,
-            width=40,
-            font=("Segoe UI", 12),
-            bg="#1e1e1e",
-            fg="white",
-            selectbackground="#ff6600",
-        )
-        self.episode_listbox.pack(side="top", fill="both", expand=True)
-        self.episode_listbox.bind("<Double-Button-1>", self.on_episode_double_click)
+        self.episode_canvas_frame = ctk.CTkFrame(self.right_frame, corner_radius=0)
+        self.episode_canvas_frame.pack(side="top", fill="both", expand=True)
 
+        self.episode_canvas = tk.Canvas(self.episode_canvas_frame, bg="#1e1e1e", highlightthickness=0)
+        self.episode_scrollbar = ctk.CTkScrollbar(
+            self.episode_canvas_frame, orientation="vertical", command=self.episode_canvas.yview
+        )
+        self.episode_canvas.configure(yscrollcommand=self.episode_scrollbar.set)
+        self.episode_scrollbar.pack(side="right", fill="y")
+        self.episode_canvas.pack(side="left", fill="both", expand=True)
+
+        self.episode_frame = ctk.CTkFrame(self.episode_canvas, corner_radius=0)
+        self.episode_canvas.create_window((0, 0), window=self.episode_frame, anchor="nw")
+        self.episode_frame.bind("<Configure>", lambda e: self.episode_canvas.configure(scrollregion=self.episode_canvas.bbox("all")))
+
+        # Resume button frame
+        self.btn_frame = ctk.CTkFrame(self.right_frame, corner_radius=5, fg_color="transparent")
+        self.btn_frame.pack(side="top", pady=10)
         self.btn_resume = ctk.CTkButton(
-            self.right_frame,
+            self.btn_frame,
             text="Resume Last Watched",
-            fg_color="#ff6600",
-            hover_color="#ff8533",
+            fg_color="#ff8533",
+            hover_color="#ffa366",
+            width=EPISODE_PANEL_WIDTH - 20,
             command=self.resume_last_watched,
         )
-        self.btn_resume.pack(side="top", pady=10)
+        self.btn_resume.pack(padx=10)
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -136,12 +150,11 @@ class AnimeLibraryUI(ctk.CTk):
             card_frame.grid(row=row, column=col, padx=10, pady=10)
             card_frame.grid_propagate(False)
 
-            # Image container
+            # Image
             image_frame = ctk.CTkFrame(card_frame, width=CARD_WIDTH, height=CARD_HEIGHT, fg_color="transparent")
             image_frame.pack_propagate(False)
             image_frame.pack(side="top", fill="both")
 
-            # Load cover
             filename = anime_name.replace(" ", "_") + ".jpg"
             cover_path = os.path.join(CACHE_DIR, filename)
             if not skip_downloading_covers and not os.path.exists(cover_path):
@@ -169,7 +182,7 @@ class AnimeLibraryUI(ctk.CTk):
             img_label.pack(fill="both", expand=True)
             card_frame.add_widget(img_label)
 
-            # Title container
+            # Title
             title_label = ctk.CTkLabel(
                 card_frame,
                 text=anime_name,
@@ -180,44 +193,55 @@ class AnimeLibraryUI(ctk.CTk):
             title_label.pack(side="bottom", fill="x", pady=5)
             card_frame.add_widget(title_label)
 
-            # Click bindings
-            for widget_item in (card_frame, img_label, title_label):
-                widget_item.bind(
-                    "<Button-1>",
-                    lambda e, n=anime_name, p=anime_path: self.select_anime(n, p),
-                )
+            # Hover binding on all children
+            for w in (card_frame, img_label, title_label):
+                w.bind("<Enter>", card_frame.on_enter)
+                w.bind("<Leave>", card_frame.on_leave)
+                w.bind("<Button-1>", lambda e, n=anime_name, p=anime_path: self.select_anime(n, p))
 
             col += 1
             if col >= CARDS_PER_ROW:
                 col = 0
                 row += 1
 
+    # Modern episode panel
     def select_anime(self, anime_name, anime_path):
         self.manager.select_anime(anime_name, anime_path)
-        self.episode_listbox.delete(0, "end")
-        for ep in self.manager.current_episodes:
-            self.episode_listbox.insert("end", ep)
 
+        # Clear previous
+        for widget in self.episode_frame.winfo_children():
+            widget.destroy()
+
+        for index, ep in enumerate(self.manager.current_episodes):
+            lbl = ctk.CTkLabel(
+                self.episode_frame,
+                text=ep,
+                font=ctk.CTkFont(size=12),
+                anchor="w",
+                padx=5,
+                pady=3,
+                corner_radius=5
+            )
+            lbl.pack(fill="x", pady=2, padx=2)
+            lbl.bind("<Enter>", lambda e, l=lbl: l.configure(fg_color="#2a2a2a"))
+            lbl.bind("<Leave>", lambda e, l=lbl: l.configure(fg_color="#1e1e1e"))
+            lbl.bind("<Button-1>", lambda e, idx=index: self.manager.play_from_index(idx))
+
+        # Highlight last watched
         result = self.manager.resume_last_watched()
         if result:
             episode_file, _ = result
-            ep_index = self.manager.current_episodes.index(episode_file)
-            self.episode_listbox.selection_clear(0, "end")
-            self.episode_listbox.selection_set(ep_index)
-
-    def on_episode_double_click(self, event):
-        selection = self.episode_listbox.curselection()
-        if not selection:
-            return
-        index = selection[0]
-        self.manager.play_from_index(index)
+            for w in self.episode_frame.winfo_children():
+                if w.cget("text") == episode_file:
+                    w.configure(fg_color="#ff6600")
 
     def resume_last_watched(self):
         result = self.manager.resume_last_watched()
         if result:
             episode_file, index = result
-            self.episode_listbox.selection_clear(0, "end")
-            self.episode_listbox.selection_set(index)
+            for w in self.episode_frame.winfo_children():
+                if w.cget("text") == episode_file:
+                    w.configure(fg_color="#ff6600")
 
     def stop_video(self):
         self.manager.player.stop()
