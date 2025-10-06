@@ -98,6 +98,7 @@ class AnimeLibraryUI(tb.Window):
 
         row = 0
         col = 0
+        skip_downloading_covers: bool = False
 
         for anime_name, anime_path in self.manager.anime_list:
             # Parent card frame
@@ -125,13 +126,15 @@ class AnimeLibraryUI(tb.Window):
             cover_path = os.path.join(CACHE_DIR, filename)
 
             # Download cover only if missing
-            if not os.path.exists(cover_path):
+            if not skip_downloading_covers and not os.path.exists(cover_path):
                 try:
                     result = download_cover(anime_name)
                     if result:
                         cover_path = result
                 except Exception:
                     print(f"[UI] Could not download cover for {anime_name} (offline?)")
+                    print("Skipping downloading for all covers....")
+                    skip_downloading_covers = True
                     cover_path = None
 
             # Load image or fallback
