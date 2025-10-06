@@ -1,7 +1,10 @@
+import io
 import os
 import tkinter as tk
-from PIL import Image, ImageTk
+
+import cairosvg
 import customtkinter as ctk
+from PIL import Image, ImageTk
 
 from cover_downloader import CACHE_DIR, download_cover
 from manager import AnimeManager
@@ -19,14 +22,13 @@ ctk.set_default_color_theme("dark-blue")
 
 
 class HoverFrame(ctk.CTkFrame):
-    """CTkFrame with hover effect"""
     def __init__(self, master=None, hover_color=None, **kwargs):
         self.hover_color = hover_color or CARD_HOVER_BG
         self.default_color = kwargs.get("fg_color", CARD_BG)
         super().__init__(master, **kwargs)
+        self._widgets = []
         self.bind("<Enter>", self.on_enter)
         self.bind("<Leave>", self.on_leave)
-        self._widgets = []
 
     def add_widget(self, widget):
         self._widgets.append(widget)
@@ -63,25 +65,47 @@ class AnimeLibraryUI(ctk.CTk):
         self.left_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
         # Right frame
-        self.right_frame = ctk.CTkFrame(self, width=EPISODE_PANEL_WIDTH, corner_radius=0)
+        self.right_frame = ctk.CTkFrame(
+            self, width=EPISODE_PANEL_WIDTH, corner_radius=0
+        )
         self.right_frame.pack(side="right", fill="y", padx=10, pady=10)
 
-        # Title
+        # Convert SVG to PNG in memory and resize
+        favicon_png = cairosvg.svg2png(
+            url=os.path.join(os.path.dirname(os.path.abspath(__file__)), "favicon.svg"),
+            output_width=32,
+            output_height=32,
+        )
+        favicon_img = Image.open(io.BytesIO(favicon_png))
+        favicon_photo = ImageTk.PhotoImage(favicon_img)
+
+        # Title label frame
+        title_frame = ctk.CTkFrame(self.left_frame, fg_color="transparent")
+        title_frame.pack(side="top", fill="x", pady=(0, 10))
+
+        # Favicon label
+        favicon_label = ctk.CTkLabel(title_frame, image=favicon_photo, text="")
+        favicon_label.image = favicon_photo
+        favicon_label.pack(side="left", padx=(0, 5))
+
+        # Title text
         self.title_label = ctk.CTkLabel(
-            self.left_frame,
+            title_frame,
             text="Anima Lite",
             font=ctk.CTkFont(size=32, weight="bold"),
             fg_color=None,
-            text_color="#ff6600"
+            text_color="#ff6600",
         )
-        self.title_label.pack(side="top", fill="x", pady=(0, 10))
+        self.title_label.pack(side="left")
 
         # Scrollable canvas for anime grid
         self.canvas_frame = ctk.CTkFrame(self.left_frame, corner_radius=0)
         self.canvas_frame.pack(side="top", fill="both", expand=True)
 
         self.canvas = tk.Canvas(self.canvas_frame, bg="#121212", highlightthickness=0)
-        self.scrollbar = ctk.CTkScrollbar(self.canvas_frame, orientation="vertical", command=self.canvas.yview)
+        self.scrollbar = ctk.CTkScrollbar(
+            self.canvas_frame, orientation="vertical", command=self.canvas.yview
+        )
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
@@ -92,39 +116,50 @@ class AnimeLibraryUI(ctk.CTk):
 
         # Episodes panel
         self.episode_label = ctk.CTkLabel(
-            self.right_frame,
-            text="Episodes",
-            font=ctk.CTkFont(size=18, weight="bold")
+            self.right_frame, text="Episodes", font=ctk.CTkFont(size=18, weight="bold")
         )
         self.episode_label.pack(side="top", pady=5)
 
         self.episode_canvas_frame = ctk.CTkFrame(self.right_frame, corner_radius=0)
         self.episode_canvas_frame.pack(side="top", fill="both", expand=True)
 
-        self.episode_canvas = tk.Canvas(self.episode_canvas_frame, bg="#1e1e1e", highlightthickness=0)
+        self.episode_canvas = tk.Canvas(
+            self.episode_canvas_frame, bg="#1e1e1e", highlightthickness=0
+        )
         self.episode_scrollbar = ctk.CTkScrollbar(
-            self.episode_canvas_frame, orientation="vertical", command=self.episode_canvas.yview
+            self.episode_canvas_frame,
+            orientation="vertical",
+            command=self.episode_canvas.yview,
         )
         self.episode_canvas.configure(yscrollcommand=self.episode_scrollbar.set)
         self.episode_scrollbar.pack(side="right", fill="y")
         self.episode_canvas.pack(side="left", fill="both", expand=True)
 
         self.episode_frame = ctk.CTkFrame(self.episode_canvas, corner_radius=0)
-        self.episode_canvas.create_window((0, 0), window=self.episode_frame, anchor="nw")
-        self.episode_frame.bind("<Configure>", lambda e: self.episode_canvas.configure(scrollregion=self.episode_canvas.bbox("all")))
+        self.episode_canvas.create_window(
+            (0, 0), window=self.episode_frame, anchor="nw"
+        )
+        self.episode_frame.bind(
+            "<Configure>",
+            lambda e: self.episode_canvas.configure(
+                scrollregion=self.episode_canvas.bbox("all")
+            ),
+        )
 
         # Resume button frame
-        self.btn_frame = ctk.CTkFrame(self.right_frame, corner_radius=5, fg_color="transparent")
+        self.btn_frame = ctk.CTkFrame(
+            self.right_frame, corner_radius=5, fg_color="transparent"
+        )
         self.btn_frame.pack(side="top", pady=10)
         self.btn_resume = ctk.CTkButton(
             self.btn_frame,
             text="Resume Last Watched",
             fg_color="#ff8533",
             hover_color="#ffa366",
-            width=EPISODE_PANEL_WIDTH - 20,
+            width=EPISODE_PANEL_WIDTH,
             command=self.resume_last_watched,
         )
-        self.btn_resume.pack(padx=10)
+        self.btn_resume.pack(padx=5)
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -145,13 +180,15 @@ class AnimeLibraryUI(ctk.CTk):
                 fg_color=CARD_BG,
                 hover_color=CARD_HOVER_BG,
                 border_width=1,
-                border_color=CARD_BORDER_COLOR
+                border_color=CARD_BORDER_COLOR,
             )
             card_frame.grid(row=row, column=col, padx=10, pady=10)
             card_frame.grid_propagate(False)
 
             # Image
-            image_frame = ctk.CTkFrame(card_frame, width=CARD_WIDTH, height=CARD_HEIGHT, fg_color="transparent")
+            image_frame = ctk.CTkFrame(
+                card_frame, width=CARD_WIDTH, height=CARD_HEIGHT, fg_color="transparent"
+            )
             image_frame.pack_propagate(False)
             image_frame.pack(side="top", fill="both")
 
@@ -169,13 +206,17 @@ class AnimeLibraryUI(ctk.CTk):
             if cover_path and os.path.exists(cover_path):
                 try:
                     img = Image.open(cover_path).convert("RGB")
-                    img = img.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
+                    img = img.resize(
+                        (CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS
+                    )
                     photo = ImageTk.PhotoImage(img)
                     img_label = ctk.CTkLabel(image_frame, image=photo, text="")
                     img_label.image = photo
                     self.cover_images[anime_name] = photo
                 except Exception:
-                    img_label = ctk.CTkLabel(image_frame, text="🖼️", font=("Segoe UI", 48))
+                    img_label = ctk.CTkLabel(
+                        image_frame, text="🖼️", font=("Segoe UI", 48)
+                    )
             else:
                 img_label = ctk.CTkLabel(image_frame, text="🖼️", font=("Segoe UI", 48))
 
@@ -188,7 +229,7 @@ class AnimeLibraryUI(ctk.CTk):
                 text=anime_name,
                 font=ctk.CTkFont(size=12),
                 wraplength=CARD_WIDTH,
-                justify="center"
+                justify="center",
             )
             title_label.pack(side="bottom", fill="x", pady=5)
             card_frame.add_widget(title_label)
@@ -197,7 +238,10 @@ class AnimeLibraryUI(ctk.CTk):
             for w in (card_frame, img_label, title_label):
                 w.bind("<Enter>", card_frame.on_enter)
                 w.bind("<Leave>", card_frame.on_leave)
-                w.bind("<Button-1>", lambda e, n=anime_name, p=anime_path: self.select_anime(n, p))
+                w.bind(
+                    "<Button-1>",
+                    lambda e, n=anime_name, p=anime_path: self.select_anime(n, p),
+                )
 
             col += 1
             if col >= CARDS_PER_ROW:
@@ -215,17 +259,19 @@ class AnimeLibraryUI(ctk.CTk):
         for index, ep in enumerate(self.manager.current_episodes):
             lbl = ctk.CTkLabel(
                 self.episode_frame,
-                text=ep,
+                text=f"{index + 1}. {ep}",  # Add numbering
                 font=ctk.CTkFont(size=12),
                 anchor="w",
                 padx=5,
                 pady=3,
-                corner_radius=5
+                corner_radius=5,
             )
             lbl.pack(fill="x", pady=2, padx=2)
             lbl.bind("<Enter>", lambda e, l=lbl: l.configure(fg_color="#2a2a2a"))
             lbl.bind("<Leave>", lambda e, l=lbl: l.configure(fg_color="#1e1e1e"))
-            lbl.bind("<Button-1>", lambda e, idx=index: self.manager.play_from_index(idx))
+            lbl.bind(
+                "<Button-1>", lambda e, idx=index: self.manager.play_from_index(idx)
+            )
 
         # Highlight last watched
         result = self.manager.resume_last_watched()
