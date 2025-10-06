@@ -116,6 +116,12 @@ class AnimeLibrary:
 
         return " ".join(common_prefix).strip(" -_")
 
+    def _guess_anime_name_from_folder(self, folder_path: str) -> str:
+        anime_name: str = folder_path.split("/")[-1]
+        anime_name = anime_name.replace("-", " ").replace("_", " ").replace("  ", " ")
+
+        return anime_name
+
     def get_anime_name(self, folder_path: str) -> str:
         """Infer the anime's name by comparing episode filenames in the folder."""
         if not os.path.isdir(folder_path):
@@ -125,7 +131,8 @@ class AnimeLibrary:
         separated = self._split_files_and_dirs(contents, folder_path)
         episode_files = separated["files"]
 
-        return self._guess_anime_name_from_episodes(episode_files)
+        # return self._guess_anime_name_from_episodes(episode_files)
+        return self._guess_anime_name_from_folder(folder_path)
 
     def scan(self) -> None:
         """
@@ -177,6 +184,10 @@ class AnimeLibrary:
         Return a list of all anime names and their folder paths.
         Uses self.anime_data if available, otherwise scans directories.
         """
+        self.anime_data = (
+            {}
+        )  # Forces scan. Remove this line to revert to original functionality.
+
         anime_list = []
         if self.anime_data:
             for name, info in self.anime_data.items():
