@@ -1,6 +1,8 @@
-# Anime Library
+# Anima Lite
 
-A Python-based application for managing and organizing anime collections.
+**Anima Lite** is a lightweight, simplified version of the original **Anima** project. While **Anima** is a full-fledged local anime library manager built using Tauri and Svelte, **Anima Lite** focuses on providing a more minimal, Python-based solution for organizing and managing anime collections.
+
+For the full-featured version, check out the [Anima project](https://github.com/Moondip-Konwar/Anima).
 
 ## Features
 
