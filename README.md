@@ -2,7 +2,7 @@
 
 **Anima Lite** is a lightweight, simplified version of the original **Anima** project. While **Anima** is a full-fledged local anime library manager built using Tauri and Svelte, **Anima Lite** focuses on providing a more minimal, Python-based solution for organizing and managing anime collections.
 
-For the full-featured version, check out the [Anima project](https://github.com/Moondip-Konwar/Anima).
+For the full-featured (but incomplete) version, check out the [Anima project](https://github.com/Moondip-Konwar/Anima).
 
 ## Features
 
@@ -33,7 +33,7 @@ For the full-featured version, check out the [Anima project](https://github.com/
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/anime-library.git
+   git clone https://github.com/Moondip-Konwar/anima-lite.git
    ```
 
 2. Install Python dependencies:
@@ -77,7 +77,7 @@ For the full-featured version, check out the [Anima project](https://github.com/
 1. Run the application:
 
    ```bash
-   python anime_library.py
+   python main.py
    ```
 
 2. Browse through anime covers in the grid.
